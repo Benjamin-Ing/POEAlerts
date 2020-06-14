@@ -17,3 +17,8 @@ Unzip.
 
 Double-click POEAlerts.jar\
 Close app from System Tray icon.
+
+# alerts.txt
+
+Keywords on individual lines will be searched on each item clicked.\
+Keywords separated by commas must all be present on the same item.
