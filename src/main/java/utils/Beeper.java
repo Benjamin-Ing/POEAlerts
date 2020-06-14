@@ -25,7 +25,7 @@ public class Beeper {
 	}
 	
 	public static void beep(float sampleRate, int hz, int msecs, double vol) throws LineUnavailableException {
-		AudioFormat af = new AudioFormat(sampleRate, 8, 1, true, false);      
+		AudioFormat af = new AudioFormat(sampleRate, 8, 1, true, false);	  
 		SourceDataLine sdl = AudioSystem.getSourceDataLine(af);
 		sdl.open(af);
 		sdl.start();

@@ -57,33 +57,33 @@ public class POEAlerts {
 		
 		final Set<Set<String>> alertStringsSet = new HashSet<>();
 		try (Stream<String> lines = Files.lines(Paths.get(ALERT_FILE))) {
-	        lines.forEach(line -> {
-	        	Set<String> alertStrings = new HashSet<>();
-	        	for (String alertString : line.split(","))
-	        		alertStrings.add(alertString.trim().toLowerCase());
-	        	alertStringsSet.add(alertStrings);
-	        });
+			lines.forEach(line -> {
+				Set<String> alertStrings = new HashSet<>();
+				for (String alertString : line.split(","))
+					alertStrings.add(alertString.trim().toLowerCase());
+				alertStringsSet.add(alertStrings);
+			});
 		}
 		
 		utils.User32DLL user32 = utils.User32DLL.INSTANCE;
 		Robot robot = new Robot();
 		LowLevelMouseProc mouseHook = new LowLevelMouseProc() {
-        	public LRESULT callback(int nCode, WPARAM wParam, LPARAM lParam) {
-        		if (wParam.intValue() == LEFT_MOUSE_DOWN) {
-	        		clipboardCheckThread.execute(() -> {
-	        			user32.GetWindowTextW(User32.INSTANCE.GetForegroundWindow(), TITLE_BUFFER, MAX_TITLE_LENGTH);
-	            		if (Native.toString(TITLE_BUFFER).equals(POE_WINDOW_NAME)) {
-	            			try {
-	            				robot.keyPress(KeyEvent.VK_CONTROL);
-		            			robot.keyPress(KeyEvent.VK_C);
+			public LRESULT callback(int nCode, WPARAM wParam, LPARAM lParam) {
+				if (wParam.intValue() == LEFT_MOUSE_DOWN) {
+					clipboardCheckThread.execute(() -> {
+						user32.GetWindowTextW(User32.INSTANCE.GetForegroundWindow(), TITLE_BUFFER, MAX_TITLE_LENGTH);
+						if (Native.toString(TITLE_BUFFER).equals(POE_WINDOW_NAME)) {
+							try {
+								robot.keyPress(KeyEvent.VK_CONTROL);
+								robot.keyPress(KeyEvent.VK_C);
 								Thread.sleep(10);
 								robot.keyRelease(KeyEvent.VK_C);
-		            			robot.keyRelease(KeyEvent.VK_CONTROL);
-		            			Thread.sleep(10);
+								robot.keyRelease(KeyEvent.VK_CONTROL);
+								Thread.sleep(10);
 							} catch (InterruptedException e) {}
-	            			Transferable contents = clipboard.getContents(null);
-	            			if (contents.isDataFlavorSupported(DataFlavor.stringFlavor)) {
-	            				try {
+							Transferable contents = clipboard.getContents(null);
+							if (contents.isDataFlavorSupported(DataFlavor.stringFlavor)) {
+								try {
 									String itemText = ((String) contents.getTransferData(DataFlavor.stringFlavor)).toLowerCase();
 									for (Set<String> alertStrings : alertStringsSet) {
 										boolean alert = true;
@@ -102,30 +102,30 @@ public class POEAlerts {
 								} finally {
 									clipboard.setContents(EMPTY_STRING, EMPTY_STRING);
 								}
-	            			}
-	            		}
-	        		});
-        		}
-        		return user32.CallNextHookEx(hhk, nCode, wParam, lParam);
-        	};
+							}
+						}
+					});
+				}
+				return user32.CallNextHookEx(hhk, nCode, wParam, lParam);
+			};
 		};
 		
 		Thread t = new Thread(() -> {
-	    	HMODULE hMod = Kernel32.INSTANCE.GetModuleHandle(null);
-	        hhk = user32.SetWindowsHookEx(WinUser.WH_MOUSE_LL, mouseHook, hMod, 0);
-	        int result;
-	        MSG msg = new MSG();
-	        while ((result = user32.GetMessage(msg, null, 0, 0)) != 0) {
-	        	if (result != -1) {
-	        		user32.TranslateMessage(msg);
-	        		user32.DispatchMessage(msg);
-	        	} else {
-	        		break;
-	        	}
-	        }
-    	});
-    	t.setDaemon(false);
-    	t.start();
+			HMODULE hMod = Kernel32.INSTANCE.GetModuleHandle(null);
+			hhk = user32.SetWindowsHookEx(WinUser.WH_MOUSE_LL, mouseHook, hMod, 0);
+			int result;
+			MSG msg = new MSG();
+			while ((result = user32.GetMessage(msg, null, 0, 0)) != 0) {
+				if (result != -1) {
+					user32.TranslateMessage(msg);
+					user32.DispatchMessage(msg);
+				} else {
+					break;
+				}
+			}
+		});
+		t.setDaemon(false);
+		t.start();
 	}
 	
 }

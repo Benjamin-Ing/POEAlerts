@@ -18,10 +18,10 @@ public interface LowLevelMouseProc extends HOOKPROC {
 		public static class ByReference extends MSLLHOOKSTRUCT implements Structure.ByReference {};
 		
 		public POINT pt;
-	    public DWORD mouseData;
-	    public DWORD flags;
-	    public DWORD time;
-	    public ULONG_PTR dwExtraInfo;
+		public DWORD mouseData;
+		public DWORD flags;
+		public DWORD time;
+		public ULONG_PTR dwExtraInfo;
 		
 		@Override
 		protected List<String> getFieldOrder() {
