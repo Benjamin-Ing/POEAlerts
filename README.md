@@ -22,3 +22,8 @@ Close app from System Tray icon.
 
 Keywords on individual lines will be searched on each item clicked.\
 Keywords separated by commas must all be present on the same item.
+
+# beep.wav
+
+You can place your own beep.wav file in the same directory and it will be used instead.\
+By default a beep sound is generated through coded sound waves and there is no beep file.
