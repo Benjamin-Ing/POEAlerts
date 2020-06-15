@@ -44,7 +44,6 @@ You can define as many rules as you want. Those rules are executed from top to b
 | -------- | ----------------------- | ------------------------------------------------------- |
 | comment  | text                    | Unused by the program. Use it as your notepad.          |
 | enabled  | true or false           | You can disable rule without deleting it from the file. |
-| matchAll | regular expression list | All rules in this list must be true for alert to trigger. In the example configuration it is used to detect if selected item is a map `"^Map Tier: \\d+$"` or to detect if selected item is a red tier map `^Map Tier: (10|11|12|13|14|15)$`. |
+| matchAll | regular expression list | All rules in this list must be true for alert to trigger. In the example configuration it is used to detect if selected item is a map `"^Map Tier: \\d+$"` or to detect if selected item is a red tier map `"^Map Tier: (10|11|12|13|14|15)$"` . |
 | matchAny | regular expression list | Any rule in this list must be true for the alert to trigger. This list can also be empty to ignore this condition. |
-| sound | folder/example.wav | A relative path to audio file. If this variable is missing than default beep sound will be played. This file must be a `.wav` file.
- |
+| sound | folder/example.wav | A relative path to audio file. If this variable is missing than default beep sound will be played. This file must be a `.wav` file. |
