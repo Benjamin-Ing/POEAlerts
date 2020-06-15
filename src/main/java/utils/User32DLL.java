@@ -8,5 +8,5 @@ public interface User32DLL extends User32 {
 	
 	User32DLL INSTANCE = Native.load("user32", User32DLL.class, W32APIOptions.DEFAULT_OPTIONS);
 	int GetWindowTextW(HWND hwnd, char[] lpString, int nMaxCount);
-	
+	int MessageBoxW(HWND hwnd, char[] lpText, char[] lpCaption, int uType);
 }
