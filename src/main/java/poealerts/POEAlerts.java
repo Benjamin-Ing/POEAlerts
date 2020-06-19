@@ -16,17 +16,18 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Stream;
-
 import javax.sound.sampled.LineUnavailableException;
 import javax.sound.sampled.UnsupportedAudioFileException;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.jna.Native;
 import com.sun.jna.platform.win32.Kernel32;
 import com.sun.jna.platform.win32.WinDef.HMODULE;
@@ -39,69 +40,129 @@ import com.sun.jna.platform.win32.WinUser.MSG;
 
 import mouse.LowLevelMouseProc;
 import utils.Beeper;
+import utils.FunctionRef;
 import utils.SysTray;
 import utils.User32DLL;
 import utils.WavPlayer;
 
 public class POEAlerts {
-	
-	private static final User32DLL user32 = utils.User32DLL.INSTANCE;
-	private static final ExecutorService clipboardCheckThread = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new SynchronousQueue<Runnable>(), new ThreadPoolExecutor.DiscardPolicy());
-	private static final Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
-	private static final StringSelection EMPTY_STRING = new StringSelection("");
-	private static final String POE_WINDOW_NAME = "Path of Exile";
-	private static final String ALERT_FILEPATH = "alerts.txt";
-	private static final String TRAY_ICON_PATH = "trayicon.png";
-	private static final String BEEP_FILEPATH = "beep.wav";
-	private static final int LEFT_MOUSE_DOWN = 513;
-	private static final int MAX_TITLE_LENGTH = 512;
-	private static final char[] TITLE_BUFFER = new char[MAX_TITLE_LENGTH * 2];
-	private static volatile HHOOK hhk;
-	
-	public static void main(String[] args) throws AWTException, FileNotFoundException, IOException, LineUnavailableException, UnsupportedAudioFileException {
-		
-		SysTray.initialize(TRAY_ICON_PATH);
-		
-		final Set<Set<String>> alertStringsSet = new HashSet<>();
-		try (Stream<String> lines = Files.lines(Paths.get(ALERT_FILEPATH))) {
-			lines.forEach(line -> {
-				Set<String> alertStrings = new HashSet<>();
-				for (String alertString : line.split(","))
-					alertStrings.add(alertString.trim().toLowerCase());
-				alertStringsSet.add(alertStrings);
-			});
-		}
-		
-		File beepFile = new File(BEEP_FILEPATH);
-		WavPlayer beep = beepFile.exists() ? new WavPlayer(beepFile) : null;
+
+    private static final User32DLL user32 = utils.User32DLL.INSTANCE;
+    private static final ExecutorService clipboardCheckThread = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
+            new SynchronousQueue<Runnable>(), new ThreadPoolExecutor.DiscardPolicy());
+    private static final Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+    private static final String POE_WINDOW_NAME = "Path of Exile";
+    private static final String ALERT_FILEPATH = "alerts.json";
+    private static final String TRAY_ICON_PATH = "trayicon.png";
+    private static final int LEFT_MOUSE_DOWN = 513;
+    private static final int MAX_TITLE_LENGTH = 512;
+    private static final char[] TITLE_BUFFER = new char[MAX_TITLE_LENGTH * 2];
+    private static volatile HHOOK hhk;
+    private static boolean alertsLoaded = false;
+    private static String previousClipboard = null;
+    private static final Timer clipboardRestartTimer = new Timer();
+    private static TimerTask clipboardResetTask = null;
+    public static void main(String[] args) throws AWTException, FileNotFoundException, IOException, LineUnavailableException, UnsupportedAudioFileException {
+        
+        final List<Alert> alertList = new LinkedList<Alert>();
+        FunctionRef reloadAltertStringsSet = () -> {
+            alertList.clear();
+            try {
+                ObjectMapper objectMapper = new ObjectMapper();
+                String rawJson = Files.readString(Paths.get(ALERT_FILEPATH));
+                List<Alert> parsedJson = objectMapper.readValue(rawJson, objectMapper.getTypeFactory().constructCollectionType(List.class, Alert.class));
+                alertList.addAll(parsedJson);
+                if(alertsLoaded) {
+                    showPopup("Success", "Alert settings reloaded");
+                }
+                clipboard.setContents(new StringSelection(""), null); // clear clipboard to unbrick listener
+            } catch (IOException | IllegalStateException e) {
+                showPopup("An Error Occured", "Failed to load (or parse) " + ALERT_FILEPATH);
+                System.err.println(e);
+            }
+        };
+
+		SysTray.initialize(TRAY_ICON_PATH, reloadAltertStringsSet);
+		reloadAltertStringsSet.execute();
+        alertsLoaded = true;
 		clipboard.addFlavorListener(new FlavorListener() {
 			@Override
 			public void flavorsChanged(FlavorEvent event) {
 				if (poeIsActive()) {
 					clipboardCheckThread.execute(() -> {
-						Transferable contents = clipboard.getContents(null);
+                        Transferable contents = clipboard.getContents(null);
 						if (contents.isDataFlavorSupported(DataFlavor.stringFlavor)) {
 							try {
-								String itemText = ((String) contents.getTransferData(DataFlavor.stringFlavor)).toLowerCase();
-								for (Set<String> alertStrings : alertStringsSet) {
-									boolean alert = true;
-									for (String alertString : alertStrings) {
-										if (!itemText.contains(alertString)) {
-											alert = false;
-											break;
-										}
-									}
-									if (alert) {
-										if (beep != null)
-											beep.play();
-										else
-											Beeper.beep(800, 75, 0.25);
-										break;
-									}
-								}
-							} catch (UnsupportedFlavorException | IOException | LineUnavailableException e) {
-							} finally {
-								clipboard.setContents(EMPTY_STRING, EMPTY_STRING);
+                                String itemText = ((String) contents.getTransferData(DataFlavor.stringFlavor));
+                                if(itemText != "" && itemText != null && !itemText.equals(previousClipboard)) {
+                                    previousClipboard = itemText;
+                                    String[] clipboardLines = itemText.split("\\r?\\n");
+                                    for(Alert alert : alertList) {
+                                        if(!alert.enabled) continue;
+                                        int andMatchCount = 0;
+                                        boolean orMatched = false;
+                                        boolean executeAlert = false;
+                                        for(String line : clipboardLines) {
+                                            for(String regexItem : alert.matchAll) {
+                                                if(line.matches(regexItem)) {
+                                                    andMatchCount++;
+                                                    break;
+                                                }
+                                            }
+                                            if(!orMatched) {
+                                                for(String regexItem : alert.matchAny) {
+                                                    if(line.matches(regexItem)) {
+                                                        orMatched = true;
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                            if((orMatched || alert.matchAny.size() == 0) && andMatchCount >= alert.matchAll.size()) {
+                                                executeAlert = true;
+                                                break;
+                                            }
+                                        }
+                                        if(executeAlert) {
+                                            boolean needForBeep = true;
+                                            try {
+                                                File alertSoundFile = new File(alert.sound);
+                                                WavPlayer alertSound = alertSoundFile.exists() ? new WavPlayer(alertSoundFile) : null;
+                                                if(alertSound != null) {
+                                                    alertSound.play();
+                                                    needForBeep = false;
+                                                }
+                                            } catch(Exception e) {
+                                                System.err.println(e);
+                                            }
+                                            if(needForBeep) {
+                                                try {
+                                                    Beeper.beep(800, 75, 0.25);
+                                                } catch(LineUnavailableException e) {
+                                                    System.err.println(e);
+                                                }
+                                            }
+                                            if(clipboardResetTask != null) {
+                                                clipboardResetTask.cancel();
+                                            }
+                                            clipboardRestartTimer.purge();
+                                            clipboardResetTask = new TimerTask(){
+                                                @Override
+                                                public void run() {
+                                                    previousClipboard = null;
+                                                }
+                                            };
+                                            clipboardRestartTimer.schedule(clipboardResetTask, 1000);
+                                            // if(alert.popup != null) {
+                                            //     showPopup(alert.comment, alert.popup); // this was bad idea
+                                            // }
+                                            break;
+                                        }
+                                    }
+                                }
+							} catch (UnsupportedFlavorException | IOException e) {
+                                System.err.println(e);
+                            } finally {
+								clipboard.setContents(contents, null);
 							}
 						}
 					});
@@ -142,10 +203,14 @@ public class POEAlerts {
 		t.setDaemon(false);
 		t.start();
 	}
-	
-	private static boolean poeIsActive() {
-		user32.GetWindowTextW(user32.GetForegroundWindow(), TITLE_BUFFER, MAX_TITLE_LENGTH);
-		return Native.toString(TITLE_BUFFER).equals(POE_WINDOW_NAME);
-	}
+
+    private static boolean poeIsActive() {
+        user32.GetWindowTextW(user32.GetForegroundWindow(), TITLE_BUFFER, MAX_TITLE_LENGTH);
+        return Native.toString(TITLE_BUFFER).equals(POE_WINDOW_NAME);
+    }
+
+    private static void showPopup(String title, String body) {
+        user32.MessageBoxW(null, Native.toCharArray(body), Native.toCharArray(title), 0x00000000);
+    }
 
 }

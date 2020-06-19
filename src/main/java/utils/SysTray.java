@@ -18,8 +18,17 @@ public class SysTray {
 
 	private static final PopupMenu popup = new PopupMenu();
 	
-	public static void initialize(String trayIconPath) {
-		final SystemTray tray = SystemTray.getSystemTray();
+	public static void initialize(String trayIconPath, FunctionRef reloadAltertStringsSet) {
+        final SystemTray tray = SystemTray.getSystemTray();
+        
+		MenuItem reloadItem = new MenuItem("Reload");
+		reloadItem.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				reloadAltertStringsSet.execute();
+			}
+        });
+        
 		MenuItem exitItem = new MenuItem("Exit");
 		exitItem.addActionListener(new ActionListener() {
 			@Override
@@ -32,7 +41,8 @@ public class SysTray {
 			BufferedImage trayIconImage = ImageIO.read(new File(trayIconPath));
 			TrayIcon trayIcon = new TrayIcon(trayIconImage.getScaledInstance(tray.getTrayIconSize().width, -1, Image.SCALE_SMOOTH));
 			trayIcon.setPopupMenu(popup);
-			tray.add(trayIcon);
+            tray.add(trayIcon);
+            popup.add(reloadItem);
 			popup.add(exitItem);
 		} catch (IOException | AWTException e) { 
 			e.printStackTrace(); 
