@@ -21,6 +21,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.sound.sampled.LineUnavailableException;
 import javax.sound.sampled.UnsupportedAudioFileException;
@@ -50,12 +51,12 @@ public class POEAlerts {
     private static final String POE_WINDOW_NAME = "Path of Exile";
     private static final String ALERT_FILEPATH = "alerts.json";
     private static final String TRAY_ICON_PATH = "trayicon.png";
+    public static final AtomicInteger checking = new AtomicInteger(0);
     private static final int LEFT_MOUSE_DOWN = 513;
     private static final int MAX_TITLE_LENGTH = 512;
     private static final char[] TITLE_BUFFER = new char[MAX_TITLE_LENGTH * 2];
     private static volatile HHOOK hhk;
     private static volatile boolean alertsLoaded = false;
-    private static volatile boolean checking = false;
     private static volatile Transferable previousClip;
     
     public static void main(String[] args) throws AWTException, FileNotFoundException, IOException, LineUnavailableException, UnsupportedAudioFileException {
@@ -82,17 +83,18 @@ public class POEAlerts {
 
 		SysTray.initialize(TRAY_ICON_PATH, reloadAltertStringsSet);
 		reloadAltertStringsSet.run();
+		previousClip = clipboard.getContents(null);
+		
 		clipboard.addFlavorListener(new FlavorListener() {
 			@Override
 			public void flavorsChanged(FlavorEvent event) {
-				if (poeIsActive()) {
+				if (checking.get() > 0 && poeIsActive()) {
 					clipboardCheckThread.execute(() -> {
-                        Transferable contents = clipboard.getContents(null);
-						if (contents.isDataFlavorSupported(DataFlavor.stringFlavor)) {
+						Transferable contents = clipboard.getContents(null);
+						if (contents != null && contents.isDataFlavorSupported(DataFlavor.stringFlavor)) {
 							try {
                                 String itemText = ((String) contents.getTransferData(DataFlavor.stringFlavor));
-                                String previousItemText = (previousClip != null && previousClip.isDataFlavorSupported(DataFlavor.stringFlavor)) ? (String) previousClip.getTransferData(DataFlavor.stringFlavor) : "";
-                                if (itemText != null && !itemText.equals(previousItemText) && !"".equals(itemText)) {
+                                if (itemText != null && !"".equals(itemText)) {
                                     String[] clipboardLines = itemText.split("\\r?\\n");
                                     for (Alert alert : alertList) {
                                         if (!alert.enabled) continue;
@@ -132,27 +134,26 @@ public class POEAlerts {
                                 }
 							} catch (UnsupportedFlavorException | IOException | LineUnavailableException | UnsupportedAudioFileException e) {
                                 System.err.println(e);
-                            } finally {
-                            	// This isn't entirely safe, since the user can copy something to clipboard 
-                            	// while the clipboard check is running, and we would be reverting their clipboard
-                            	// to the state when they left-clicked, and not to the present state.
-                            	clipboard.setContents(previousClip, null);
                             }
 						}
+						// This isn't entirely safe, since the user can copy something to clipboard 
+	                	// while the clipboard check is running, and we would be reverting their clipboard
+	                	// to the state when they left-clicked, and not to the present state.
+	                	clipboard.setContents(previousClip, null);
+	                	checking.set(0);
 					});
+				} else {
+					previousClip = clipboard.getContents(null);
 				}
-				checking = false;
 			}
 		});
 		
 		final Robot robot = new Robot();
 		LowLevelMouseProc mouseHook = new LowLevelMouseProc() {
 			public LRESULT callback(int nCode, WPARAM wParam, LPARAM lParam) {
-				if (!checking)
-					previousClip = clipboard.getContents(null);
 				if (wParam.intValue() == LEFT_MOUSE_DOWN) {
 					if (poeIsActive()) {
-						checking = true;
+						checking.incrementAndGet();
 						robot.keyPress(KeyEvent.VK_CONTROL);
 						robot.keyPress(KeyEvent.VK_C);
 						robot.keyRelease(KeyEvent.VK_C);
