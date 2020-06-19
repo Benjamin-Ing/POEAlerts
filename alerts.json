@@ -19,7 +19,7 @@
         ],
         "matchAny": [
             "^+\\d+% to Monster Critical Strike Multiplier$",
-            "^Players cannot Regenerate Life, Mana or Energy Shield$",
+            "^Players cannot Regenerate Life, Mana or Energy Shield$"
         ],
         "sound": "default.wav"
     },
@@ -36,7 +36,7 @@
     },
     {
         "comment": "Dangerous to Elemental Builds",
-        "enabled": true,
+        "enabled": false,
         "matchAll": [
             "^Map Tier: \\d+$"
         ],

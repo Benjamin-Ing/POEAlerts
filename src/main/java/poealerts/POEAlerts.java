@@ -54,7 +54,7 @@ public class POEAlerts {
     private static final int MAX_TITLE_LENGTH = 512;
     private static final char[] TITLE_BUFFER = new char[MAX_TITLE_LENGTH * 2];
     private static volatile HHOOK hhk;
-    private static boolean alertsLoaded = false;
+    private static volatile boolean alertsLoaded = false;
     private static volatile boolean checking = false;
     private static volatile Transferable previousClip;
     
@@ -70,15 +70,18 @@ public class POEAlerts {
                 alertList.addAll(parsedJson);
                 if(alertsLoaded)
                     showPopup("Success", "Alert settings reloaded");
+                else
+                	alertsLoaded = true;
             } catch (IOException | IllegalStateException e) {
                 showPopup("An Error Occured", "Failed to load (or parse) " + ALERT_FILEPATH);
                 System.err.println(e);
+                if (!alertsLoaded)
+                	System.exit(-1);
             }
         };
 
 		SysTray.initialize(TRAY_ICON_PATH, reloadAltertStringsSet);
 		reloadAltertStringsSet.run();
-        alertsLoaded = true;
 		clipboard.addFlavorListener(new FlavorListener() {
 			@Override
 			public void flavorsChanged(FlavorEvent event) {
