@@ -18,14 +18,14 @@ public class SysTray {
 
 	private static final PopupMenu popup = new PopupMenu();
 	
-	public static void initialize(String trayIconPath, FunctionRef reloadAltertStringsSet) {
+	public static void initialize(String trayIconPath, Runnable reloadAltertStringsSet) {
         final SystemTray tray = SystemTray.getSystemTray();
         
 		MenuItem reloadItem = new MenuItem("Reload");
 		reloadItem.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				reloadAltertStringsSet.execute();
+				reloadAltertStringsSet.run();
 			}
         });
         
