@@ -36,7 +36,7 @@ While also disabling rules:
 
 # alerts.json - advanced config
 
-You can define as many rules as you want. Those rules are executed from top to bottom, first one that matches will trigger sound effect, remaining will be ignored. This program can also be used to trigger sounds for alerting you before you vendor good identified item.
+You can define as many rules as you want. Those rules are executed from top to bottom, first one that matches will trigger sound effect, remaining will be ignored. This program can also be used to trigger sounds for alerting you before you vendor good identified items.
 
 ## Parameters:
 
